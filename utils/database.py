@@ -1,14 +1,23 @@
 import mysql.connector
+import pymysql
+import pymysql.cursors
 
 class Database:
     def __init__(self):
-        self.connection = mysql.connector.connect(
+        self.connection = pymysql.connect(
             host="localhost",
             user="root",
             password="admin123",
             database="student_information_system"
         )
-        self.cursor = self.connection.cursor(dictionary=True)
+        self.cursor = self.connection.cursor(pymysql.cursors.DictCursor)
+        # self.connection = mysql.connector.connect(
+        #     host="localhost",
+        #     user="root",
+        #     password="admin123",
+        #     database="student_information_system"
+        # )
+        # self.cursor = self.connection.cursor(dictionary=True)
 
     def execute_query(self, query, params=None):
         try:

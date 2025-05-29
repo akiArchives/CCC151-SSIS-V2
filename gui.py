@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QTableWidget, QStackedWidget,
-    QHeaderView, QLineEdit, QSizePolicy, QSpacerItem, QLabel
+    QHeaderView, QLineEdit, QSizePolicy, QSpacerItem, QLabel, QComboBox
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QFont, QFontDatabase, QPixmap
@@ -9,6 +9,7 @@ from utils import Database, add_shortcuts
 from controllers import *
 from pathlib import Path
 import os
+import mysql.connector
 
 
 class MainWindow(QMainWindow):
@@ -127,28 +128,36 @@ class MainWindow(QMainWindow):
     def setup_students_tab(self):
         layout = QVBoxLayout(self.students_tab)
 
-        # Buttons and Search Bar
+        # Buttons, Search Bar and Search By
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(32, 24, 32, 0)
         self.student_search = QLineEdit()
         self.student_search.setObjectName("SearchBar")
         self.student_search.setPlaceholderText("Search students...")
         self.student_search.textChanged.connect(self.filter_students_table)
+        self.student_search.returnPressed.connect(self.filter_students_table)
         self.student_search.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)  # <-- Add this line
         btn_layout.addWidget(self.student_search)
 
+        self.Ssearch_by_label = QComboBox()
+        self.Ssearch_by_label.setObjectName("searchBy")
+        self.Ssearch_by_label.addItems(["All", "ID Number", "First Name", "Last Name", "Year Level", "Gender", "Program Code"])
+        btn_layout.addWidget(self.Ssearch_by_label)
+        
         self.add_student_btn = QPushButton("")
         self.add_student_btn.setObjectName("AddButton")
         self.add_student_btn.setIcon(QIcon("resources/icons/add.png"))
         self.add_student_btn.setIconSize(QSize(34, 34))
         self.add_student_btn.clicked.connect(self.add_student)
         self.add_student_btn.setToolTip("Add Student")
+        
         self.edit_student_btn = QPushButton("")
         self.edit_student_btn.setObjectName("EditButton")
         self.edit_student_btn.setIconSize(QSize(34, 34))
         self.edit_student_btn.setIcon(QIcon("resources/icons/edit.png"))
         self.edit_student_btn.clicked.connect(self.edit_student)
         self.edit_student_btn.setToolTip("Edit Selected Student")
+        
         self.delete_student_btn = QPushButton("")
         self.delete_student_btn.setObjectName("DeleteButton")
         self.delete_student_btn.setIconSize(QSize(34, 34))
@@ -179,8 +188,10 @@ class MainWindow(QMainWindow):
         layout.addLayout(btn_layout)
         layout.addWidget(self.students_table)
 
-    def filter_students_table(self, text):
-        filter_students_table(self.students_table, text)
+    def filter_students_table(self):
+        selected_field = self.Ssearch_by_label.currentText()
+        query = self.student_search.text()
+        filter_students_table(self.students_table, query, selected_field)
 
     def setup_programs_tab(self):
         layout = QVBoxLayout(self.programs_tab)
@@ -194,6 +205,11 @@ class MainWindow(QMainWindow):
         self.program_search.textChanged.connect(self.filter_programs_table)
         self.program_search.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         btn_layout.addWidget(self.program_search)
+
+        self.Psearch_by_label = QComboBox()
+        self.Psearch_by_label.setObjectName("searchBy")
+        self.Psearch_by_label.addItems(["All", "Code", "Name", "College"])
+        btn_layout.addWidget(self.Psearch_by_label)
 
         self.add_program_btn = QPushButton("")
         self.add_program_btn.setObjectName("AddButton")
@@ -235,8 +251,10 @@ class MainWindow(QMainWindow):
         layout.addLayout(btn_layout)
         layout.addWidget(self.programs_table)
 
-    def filter_programs_table(self, text):
-        filter_programs_table(self.programs_table, text)
+    def filter_programs_table(self):
+        selected_field = self.Psearch_by_label.currentText()
+        query = self.program_search.text()
+        filter_programs_table(self.programs_table, query, selected_field)
 
     def setup_colleges_tab(self):
         layout = QVBoxLayout(self.colleges_tab)
@@ -250,6 +268,12 @@ class MainWindow(QMainWindow):
         self.college_search.textChanged.connect(self.filter_colleges_table)
         self.college_search.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         btn_layout.addWidget(self.college_search)
+        
+        self.Csearch_by_label = QComboBox()
+        self.Csearch_by_label.setObjectName("searchBy")
+        self.Csearch_by_label.addItems(["All", "Code", "Name"])
+        self.Csearch_by_label.currentTextChanged.connect(self.sort_college_table)
+        btn_layout.addWidget(self.Csearch_by_label)  
 
         self.add_college_btn = QPushButton("")
         self.add_college_btn.setObjectName("AddButton")
@@ -291,8 +315,22 @@ class MainWindow(QMainWindow):
         layout.addLayout(btn_layout)
         layout.addWidget(self.colleges_table)
 
-    def filter_colleges_table(self, text):
-        filter_colleges_table(self.colleges_table, text)
+    def sort_college_table(self, selected_text):
+        column_map = {
+            "Code": "code",
+            "Name": "name",
+        }
+
+        column = column_map.get(selected_text)
+        if column:
+            # Call the external load_colleges function, passing db and table
+            load_colleges(self.db, self.colleges_table, order_by_column=column)
+
+
+    def filter_colleges_table(self):
+        selected_field = self.Csearch_by_label.currentText()
+        query = self.college_search.text()
+        filter_colleges_table(self.colleges_table, query, selected_field)
 
     # Student CRUDL methods
     def load_students(self):

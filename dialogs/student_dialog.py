@@ -1,4 +1,5 @@
 from PyQt6.QtWidgets import QDialog, QFormLayout, QLineEdit, QComboBox, QDialogButtonBox, QMessageBox
+import mysql.connector
 
 class StudentDialog(QDialog):
     def __init__(self, db, student=None, programs=None, parent=None):

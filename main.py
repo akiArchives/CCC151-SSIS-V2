@@ -1,7 +1,8 @@
 import sys
-import mysql.connector
 from PyQt6.QtWidgets import QApplication
+import mysql.connector
 from gui import MainWindow, load_font
+import pymysql
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

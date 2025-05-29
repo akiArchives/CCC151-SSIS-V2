@@ -157,6 +157,24 @@ QComboBox#FormComboBox {
     padding-left: 5px   
 }
 
+QComboBox#searchBy {
+    background: #BEC2FB;
+    border: 2px solid #BEC2FB;
+    border-radius: 22px;
+    padding-left: 18px;
+    font-family: "Roboto-Regular";
+    color: #3D46C8;
+    min-height: 40px;   
+    max-height: 40px;   
+}
+
+QComboBox#searchBy::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    background: transparent;
+    width: 30px;
+}
+
 QComboBox::down-arrow {
     image: url("resources/icons/ArrowDown.svg"); /* Use your icon path */
     width: 18px;
