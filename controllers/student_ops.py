@@ -80,60 +80,34 @@ def add_student(db, students_table, parent):
 
     dialog = StudentDialog(db, programs=programs, parent=parent)
     dialog.setObjectName("add_student_dialog")
+
     if dialog.exec() == QDialog.DialogCode.Accepted:
         student_data = dialog.get_student_data()
+
+        # Check for duplicate ID Number
+        existing = db.execute_query("SELECT id_number FROM students WHERE id_number = %s", (student_data['id_number'],))
+        if existing:
+            QMessageBox.warning(parent, "Duplicate Entry", f"Student ID '{student_data['id_number']}' already exists.")
+            return
+
         query = """
         INSERT INTO students (id_number, first_name, last_name, year_level, gender, program_code)
         VALUES (%s, %s, %s, %s, %s, %s)
         """
-        try:
-            result = db.execute_query(query, (
-                student_data['id_number'],
-                student_data['first_name'],
-                student_data['last_name'],
-                student_data['year_level'],
-                student_data['gender'],
-                student_data['program_code']
-            ))
-            if result:
-                from .student_ops import load_students
-                load_students(db, students_table)
-                QMessageBox.information(parent, "Success", "Student added successfully!")
-            else:
-                QMessageBox.warning(parent, "Error", "Failed to add student.")
-        except pymysql.err.IntegrityError as e:
-            if "Duplicate entry" in str(e):
-                QMessageBox.warning(parent, "Duplicate ID", f"Student ID '{student_data['id_number']}' already exists.")
-            else:
-                QMessageBox.critical(parent, "Database Error", str(e))
+        result = db.execute_query(query, (
+            student_data['id_number'],
+            student_data['first_name'],
+            student_data['last_name'],
+            student_data['year_level'],
+            student_data['gender'],
+            student_data['program_code']
+        ))
 
-# def add_student(db, students_table, parent):
-#     programs = db.execute_query("SELECT code, name FROM programs")
-#     if not programs:
-#         QMessageBox.warning(parent, "Error", "No programs available. Please add a program first.")
-#         return
-
-#     dialog = StudentDialog(db, programs=programs, parent=parent)
-#     dialog.setObjectName("add_student_dialog")
-#     if dialog.exec() == QDialog.DialogCode.Accepted:
-#         student_data = dialog.get_student_data()
-#         query = """
-#         INSERT INTO students (id_number, first_name, last_name, year_level, gender, program_code)
-#         VALUES (%s, %s, %s, %s, %s, %s)
-#         """
-#         if db.execute_query(query, (
-#             student_data['id_number'],
-#             student_data['first_name'],
-#             student_data['last_name'],
-#             student_data['year_level'],
-#             student_data['gender'],
-#             student_data['program_code']
-#         )):
-#             from .student_ops import load_students
-#             load_students(db, students_table)
-#             QMessageBox.information(parent, "Success", "Student added successfully!")
-#         else:
-#             QMessageBox.warning(parent, "Error", "Failed to add student.")
+        if result:
+            load_students(db, students_table)
+            QMessageBox.information(parent, "Success", "Student added successfully!")
+        else:
+            QMessageBox.warning(parent, "Error", "Failed to add student.")
 
 def edit_student(db, students_table, parent):
     selected = students_table.selectedItems()
@@ -142,9 +116,9 @@ def edit_student(db, students_table, parent):
         return
 
     row = selected[0].row()
-    id_number = students_table.item(row, 0).text()
+    original_id = students_table.item(row, 0).text()
 
-    student = db.execute_query("SELECT * FROM students WHERE id_number = %s", (id_number,))
+    student = db.execute_query("SELECT * FROM students WHERE id_number = %s", (original_id,))
     if not student:
         QMessageBox.warning(parent, "Error", "Selected student not found.")
         return
@@ -152,97 +126,53 @@ def edit_student(db, students_table, parent):
     programs = db.execute_query("SELECT code, name FROM programs")
     dialog = StudentDialog(db, student=student[0], programs=programs, parent=parent)
     dialog.setObjectName("edit_student_dialog")
+
     if dialog.exec() == QDialog.DialogCode.Accepted:
         student_data = dialog.get_student_data()
+        new_id = student_data['id_number']
+
+        # Check for duplicate ID Number, excluding the current student
+        if new_id != original_id:
+            existing = db.execute_query("SELECT id_number FROM students WHERE id_number = %s", (new_id,))
+            if existing:
+                QMessageBox.warning(parent, "Duplicate Entry", f"Student ID '{new_id}' already exists.")
+                return
+
         query = """
         UPDATE students 
         SET id_number = %s, first_name = %s, last_name = %s, year_level = %s, gender = %s, program_code = %s
         WHERE id_number = %s
         """
+        result = None
         try:
             result = db.execute_query(query, (
-                student_data['id_number'],
+                new_id,
                 student_data['first_name'],
                 student_data['last_name'],
                 student_data['year_level'],
                 student_data['gender'],
                 student_data['program_code'],
-                id_number
+                original_id
             ))
-            if result:
-                from .student_ops import load_students
-                load_students(db, students_table)
-
-                # Reselect the updated row
-                for row in range(students_table.rowCount()):
-                    if students_table.item(row, 0).text() == student_data['id_number']:
-                        students_table.selectRow(row)
-                        break
-
-                QMessageBox.information(parent, "Success", "Student updated successfully!")
-            else:
-                QMessageBox.warning(parent, "Error", "Failed to update student.")
         except pymysql.err.IntegrityError as e:
             if "Duplicate entry" in str(e):
-                QMessageBox.warning(parent, "Duplicate ID", f"Student ID '{student_data['id_number']}' already exists.")
+                QMessageBox.warning(parent, "Duplicate ID", f"Student ID '{new_id}' already exists.")
+                return
             else:
                 QMessageBox.critical(parent, "Database Error", str(e))
+                return
 
-# def edit_student(db, students_table, parent):
-#     selected = students_table.selectedItems()
-#     if not selected:
-#         QMessageBox.warning(parent, "Warning", "Please select a student to edit.")
-#         return
+        if result:
+            load_students(db, students_table)
+            # Reselect the updated row
+            for row in range(students_table.rowCount()):
+                if students_table.item(row, 0).text() == new_id:
+                    students_table.selectRow(row)
+                    break
+            QMessageBox.information(parent, "Success", "Student updated successfully!")
+        else:
+            QMessageBox.warning(parent, "Error", "Failed to update student.")
 
-#     row = selected[0].row()
-#     id_number = students_table.item(row, 0).text()
-    
-#     student = db.execute_query("SELECT * FROM students WHERE id_number = %s", (id_number,))
-#     if not student:
-#         QMessageBox.warning(parent, "Error", "Selected student not found.")
-#         return
-    
-#     programs = db.execute_query("SELECT code, name FROM programs")
-#     dialog = StudentDialog(db, student=student[0], programs=programs, parent=parent)
-#     dialog.setObjectName("edit_student_dialog")
-#     if dialog.exec() == QDialog.DialogCode.Accepted:
-#         student_data = dialog.get_student_data()
-#         query = """
-#         UPDATE students 
-#         SET id_number = %s, first_name = %s, last_name = %s, year_level = %s, gender = %s, program_code = %s
-#         WHERE id_number = %s
-#         """
-#         if db.execute_query(query, (
-#             student_data['id_number'],
-#             student_data['first_name'],
-#             student_data['last_name'],
-#             student_data['year_level'],
-#             student_data['gender'],
-#             student_data['program_code'],
-#             id_number
-#         )):
-#             from .student_ops import load_students
-#             load_students(db, students_table)
-            
-#             # --- Select the edited student row ---
-#             for row in range(students_table.rowCount()):
-#                 if students_table.item(row, 0).text() == student_data['id_number']:
-#                     students_table.selectRow(row)
-#                     break
-#             QMessageBox.information(parent, "Success", "Student updated successfully!")
-#         else:
-#             QMessageBox.warning(parent, "Error", "Failed to update student.")
-
-# def filter_students_table(students_table, text):
-
-#     for row in range(students_table.rowCount()):
-#         match = False
-#         for col in range(students_table.columnCount()):
-#             item = students_table.item(row, col)
-#             if item and text.lower() in item.text().lower():
-#                 match = True
-#                 break
-#         students_table.setRowHidden(row, not match)
         
 def filter_students_table(table_widget, search_bar, search_by_combo):
     search_by = search_by_combo.lower()

@@ -51,7 +51,7 @@ def load_colleges(db, colleges_table, order_by_column=None):
 #         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         
 #         colleges_table.setSortingEnabled(True)  # Re-enable sorting after loading data
-        
+  
 def delete_college(db, colleges_table, parent):
     selected_ranges = colleges_table.selectedRanges()
     if not selected_ranges:
@@ -65,62 +65,98 @@ def delete_college(db, colleges_table, parent):
     rows = sorted(rows, reverse=True)
 
     codes = [colleges_table.item(row, 0).text() for row in rows]
+
+    for code in codes:
+        # Check for linked programs BEFORE asking to delete
+        program_check = db.fetch_one("SELECT 1 FROM programs WHERE college_code = %s LIMIT 1", (code,))
+        if program_check:
+            QMessageBox.warning(
+                parent,
+                "Cannot Delete",
+                f"College '{code}' cannot be deleted because it has associated programs."
+            )
+            return  # stop the whole deletion if any college has linked programs
+
+    # Confirm deletion
     reply = QMessageBox.question(
-        parent, 'Confirm Delete',
+        parent,
+        'Confirm Delete',
         f"Are you sure you want to delete the selected college(s)?\n{', '.join(codes)}",
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
     )
+
     if reply == QMessageBox.StandardButton.Yes:
         deleted_count = 0
         for code in codes:
             result = db.execute_query("DELETE FROM colleges WHERE code = %s", (code,))
             if result > 0:
                 deleted_count += 1
+
         load_colleges(db, colleges_table)
+
         if deleted_count > 0:
             QMessageBox.information(parent, "Success", "Selected college(s) deleted successfully!")
         else:
             QMessageBox.warning(parent, "Warning", "No college(s) were deleted.")
+  
+      
+# def delete_college(db, colleges_table, parent):
+#     selected_ranges = colleges_table.selectedRanges()
+#     if not selected_ranges:
+#         QMessageBox.warning(parent, "Warning", "Please select college(s) to delete.")
+#         return
+
+#     rows = set()
+#     for sel_range in selected_ranges:
+#         for row in range(sel_range.topRow(), sel_range.bottomRow() + 1):
+#             rows.add(row)
+#     rows = sorted(rows, reverse=True)
+
+#     codes = [colleges_table.item(row, 0).text() for row in rows]
+#     reply = QMessageBox.question(
+#         parent, 'Confirm Delete',
+#         f"Are you sure you want to delete the selected college(s)?\n{', '.join(codes)}",
+#         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+#     )
+#     if reply == QMessageBox.StandardButton.Yes:
+#         deleted_count = 0
+#         for code in codes:
+#             result = db.execute_query("DELETE FROM colleges WHERE code = %s", (code,))
+#             if result > 0:
+#                 deleted_count += 1
+#         load_colleges(db, colleges_table)
+#         if deleted_count > 0:
+#             QMessageBox.information(parent, "Success", "Selected college(s) deleted successfully!")
+#         else:
+#             QMessageBox.warning(parent, "Warning", "No college(s) were deleted.")
 
 def add_college(db, colleges_table, parent):
     dialog = CollegeDialog(db, parent=parent)
     dialog.setObjectName("add_college_dialog")
+
     if dialog.exec() == QDialog.DialogCode.Accepted:
         college_data = dialog.get_college_data()
+
+        # Explicit duplicate check BEFORE inserting
+        existing = db.fetch_one("SELECT 1 FROM colleges WHERE code = %s", (college_data['code'],))
+        if existing:
+            QMessageBox.warning(parent, "Duplicate Code", f"College code '{college_data['code']}' already exists.")
+            return
+
         query = "INSERT INTO colleges (code, name) VALUES (%s, %s)"
         try:
-            if db.execute_query(query, (
+            db.execute_query(query, (
                 college_data['code'],
                 college_data['name']
-            )):
-                load_colleges(db, colleges_table)
-                if hasattr(parent, 'load_programs'):
-                    parent.load_programs()
-                QMessageBox.information(parent, "Success", "College added successfully!")
-            else:
-                QMessageBox.warning(parent, "Error", "Failed to add college.")
-        except IntegrityError as e:
-            if "Duplicate entry" in str(e):
-                QMessageBox.warning(parent, "Duplicate Code", f"College code '{college_data['code']}' already exists.")
-            else:
-                QMessageBox.critical(parent, "Database Error", str(e))
+            ))
+        except Exception as e:
+            QMessageBox.critical(parent, "Database Error", str(e))
+            return
 
-# def add_college(db, colleges_table, parent):
-#     dialog = CollegeDialog(db, parent=parent)
-#     dialog.setObjectName("add_college_dialog")
-#     if dialog.exec() == QDialog.DialogCode.Accepted:
-#         college_data = dialog.get_college_data()
-#         query = "INSERT INTO colleges (code, name) VALUES (%s, %s)"
-#         if db.execute_query(query, (
-#             college_data['code'],
-#             college_data['name']
-#         )):
-#             load_colleges(db, colleges_table)
-#             if hasattr(parent, 'load_programs'):
-#                 parent.load_programs()
-#             QMessageBox.information(parent, "Success", "College added successfully!")
-#         else:
-#             QMessageBox.warning(parent, "Error", "Failed to add college.")
+        load_colleges(db, colleges_table)
+        if hasattr(parent, 'load_programs'):
+            parent.load_programs()
+        QMessageBox.information(parent, "Success", "College added successfully!")
 
 def edit_college(db, colleges_table, parent):
     selected = colleges_table.selectedItems()
@@ -130,38 +166,49 @@ def edit_college(db, colleges_table, parent):
 
     row = selected[0].row()
     original_code = colleges_table.item(row, 0).text()
-    
+
     college = db.execute_query("SELECT * FROM colleges WHERE code = %s", (original_code,))
     if not college:
         QMessageBox.warning(parent, "Error", "Selected college not found.")
         return
-    
+
     dialog = CollegeDialog(db, college=college[0], parent=parent)
     dialog.setObjectName("edit_college_dialog")
     if dialog.exec() == QDialog.DialogCode.Accepted:
         college_data = dialog.get_college_data()
+        new_code = college_data['code']
+
+        # Check for duplicate code if changed
+        if new_code != original_code:
+            existing = db.execute_query("SELECT code FROM colleges WHERE code = %s", (new_code,))
+            if existing:
+                QMessageBox.warning(parent, "Duplicate Entry", f"College code '{new_code}' already exists.")
+                return
+
         query = "UPDATE colleges SET code = %s, name = %s WHERE code = %s"
         try:
             if db.execute_query(query, (
-                college_data['code'],
+                new_code,
                 college_data['name'],
                 original_code
             )):
                 load_colleges(db, colleges_table)
-                
+
                 # Select the updated row
                 for row in range(colleges_table.rowCount()):
-                    if colleges_table.item(row, 0).text() == college_data['code']:
+                    if colleges_table.item(row, 0).text() == new_code:
                         colleges_table.selectRow(row)
                         break
+
                 if hasattr(parent, 'load_programs'):
                     parent.load_programs()
+
                 QMessageBox.information(parent, "Success", "College updated successfully!")
             else:
                 QMessageBox.warning(parent, "Error", "Failed to update college.")
         except IntegrityError as e:
             if "Duplicate entry" in str(e):
-                QMessageBox.warning(parent, "Duplicate Code", f"College code '{college_data['code']}' already exists.")
+                QMessageBox.warning(parent, "Duplicate Code", f"College code '{new_code}' already exists.")
             else:
                 QMessageBox.critical(parent, "Database Error", str(e))
 
@@ -184,23 +231,31 @@ def edit_college(db, colleges_table, parent):
 #     if dialog.exec() == QDialog.DialogCode.Accepted:
 #         college_data = dialog.get_college_data()
 #         query = "UPDATE colleges SET code = %s, name = %s WHERE code = %s"
-#         if db.execute_query(query, (
-#             college_data['code'],
-#             college_data['name'],
-#             original_code
-#         )):
-#             load_colleges(db, colleges_table)
-            
-#             # --- Select the edited college row ---
-#             for row in range(colleges_table.rowCount()):
-#                 if colleges_table.item(row, 0).text() == college_data['code']:
-#                     colleges_table.selectRow(row)
-#                     break
-#             if hasattr(parent, 'load_programs'):
-#                 parent.load_programs()
-#             QMessageBox.information(parent, "Success", "College updated successfully!")
-#         else:
-#             QMessageBox.warning(parent, "Error", "Failed to update college.")
+#         try:
+#             if db.execute_query(query, (
+#                 college_data['code'],
+#                 college_data['name'],
+#                 original_code
+#             )):
+#                 load_colleges(db, colleges_table)
+                
+#                 # Select the updated row
+#                 for row in range(colleges_table.rowCount()):
+#                     if colleges_table.item(row, 0).text() == college_data['code']:
+#                         colleges_table.selectRow(row)
+#                         break
+#                 if hasattr(parent, 'load_programs'):
+#                     parent.load_programs()
+#                 QMessageBox.information(parent, "Success", "College updated successfully!")
+#             else:
+#                 QMessageBox.warning(parent, "Error", "Failed to update college.")
+#         except IntegrityError as e:
+#             if "Duplicate entry" in str(e):
+#                 QMessageBox.warning(parent, "Duplicate Code", f"College code '{college_data['code']}' already exists.")
+#             else:
+#                 QMessageBox.critical(parent, "Database Error", str(e))
+
+
 
 def filter_colleges_table(table_widget, search_bar, search_by_combo):
     search_by = search_by_combo.lower()

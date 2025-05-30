@@ -55,6 +55,8 @@ class MainWindow(QMainWindow):
         self.students_btn.setFixedHeight(40)
         self.students_btn.setFlat(True)
         self.students_btn.setCheckable(True)
+        self.students_btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.students_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.students_btn.clicked.connect(lambda: self.sidebar_navigate(0))
         
         self.programs_btn = QPushButton(" Programs")
@@ -64,6 +66,8 @@ class MainWindow(QMainWindow):
         self.programs_btn.setFixedHeight(40)
         self.programs_btn.setFlat(True)
         self.programs_btn.setCheckable(True)
+        self.programs_btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.programs_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.programs_btn.clicked.connect(lambda: self.sidebar_navigate(1))
         
         self.colleges_btn = QPushButton(" Colleges")
@@ -73,6 +77,8 @@ class MainWindow(QMainWindow):
         self.colleges_btn.setFixedHeight(40)
         self.colleges_btn.setFlat(True)
         self.colleges_btn.setCheckable(True)
+        self.colleges_btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.colleges_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.colleges_btn.clicked.connect(lambda: self.sidebar_navigate(2))
 
         sidebar_layout.addWidget(self.students_btn)
@@ -125,6 +131,7 @@ class MainWindow(QMainWindow):
     
         add_shortcuts(self)
     
+    
     def setup_students_tab(self):
         layout = QVBoxLayout(self.students_tab)
 
@@ -141,7 +148,9 @@ class MainWindow(QMainWindow):
 
         self.Ssearch_by_label = QComboBox()
         self.Ssearch_by_label.setObjectName("searchBy")
-        self.Ssearch_by_label.addItems(["All", "ID Number", "First Name", "Last Name", "Year Level", "Gender", "Program Code"])
+        self.Ssearch_by_label.addItems(["All", "ID Number", "First Name", "Last Name", "Year Level", "Gender", "Program"])
+        self.Ssearch_by_label.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.Ssearch_by_label.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_layout.addWidget(self.Ssearch_by_label)
         
         self.add_student_btn = QPushButton("")
@@ -150,6 +159,8 @@ class MainWindow(QMainWindow):
         self.add_student_btn.setIconSize(QSize(34, 34))
         self.add_student_btn.clicked.connect(self.add_student)
         self.add_student_btn.setToolTip("Add Student")
+        self.add_student_btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.add_student_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         
         self.edit_student_btn = QPushButton("")
         self.edit_student_btn.setObjectName("EditButton")
@@ -157,6 +168,8 @@ class MainWindow(QMainWindow):
         self.edit_student_btn.setIcon(QIcon("resources/icons/edit.png"))
         self.edit_student_btn.clicked.connect(self.edit_student)
         self.edit_student_btn.setToolTip("Edit Selected Student")
+        self.edit_student_btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.edit_student_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         
         self.delete_student_btn = QPushButton("")
         self.delete_student_btn.setObjectName("DeleteButton")
@@ -164,6 +177,8 @@ class MainWindow(QMainWindow):
         self.delete_student_btn.setIcon(QIcon("resources/icons/delete.png"))
         self.delete_student_btn.clicked.connect(self.delete_student)
         self.delete_student_btn.setToolTip("Delete Selected Student(s)")
+        self.delete_student_btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.delete_student_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         
         btn_layout.addWidget(self.add_student_btn)
         btn_layout.addWidget(self.edit_student_btn)
@@ -314,6 +329,7 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(btn_layout)
         layout.addWidget(self.colleges_table)
+
 
     def sort_college_table(self, selected_text):
         column_map = {
